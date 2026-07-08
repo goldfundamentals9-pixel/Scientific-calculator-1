@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reckoner — Scientific Calculator</title>
+
+<link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --body-dark:#1b1d21;
+    --body-mid:#26292f;
+    --panel-line:#34383f;
+    --lcd-bg:#c9d6c2;
+    --lcd-bg-deep:#b9c8b1;
+    --lcd-ink:#213a26;
+    --lcd-ink-dim:#5c7060;
+    --key-num:#31353c;
+    --key-num-top:#3b4048;
+    --key-fn:#3a4048;
+    --key-fn-top:#454d57;
+    --key-op:#c98a3a;
+    --key-op-top:#dc9c46;
+    --key-eq:#4f7d63;
+    --key-eq-top:#5d9273;
+    --text-soft:#aab0ba;
+    --text-faint:#6b7280;
+  }
+
+  html,body{
+    height:100%;
+    background:
+      radial-gradient(ellipse at top, #24272d 0%, #16171a 70%);
+    color:var(--text-soft);
+    font-family:'IBM Plex Sans', sans-serif;
+  }
+
+  body{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:32px 16px;
+  }
+
+  .rig{
+    width:100%;
+    max-width:1040px;
+    display:grid;
+    grid-template-columns:1fr;
+    gap:22px;
+  }
+
+  @media (min-width: 900px){
+    .rig{
+      grid-template-columns: 300px 1fr;
+      align-items:start;
+    }
+  }
+
+  /* ---------- Header / brass plate ---------- */
+  .plate{
+    grid-column:1/-1;
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    padding:0 6px 4px 6px;
+    border-bottom:1px solid var(--panel-line);
+    margin-bottom:-4px;
+  }
+  .plate .mark{
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:1.15rem;
+    letter-spacing:0.14em;
+    color:#e7e2d6;
+    text-transform:uppercase;
+  }
+  .plate .mark span{ color:var(--key-op); }
+  .plate .model{
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.7rem;
+    color:var(--text-faint);
+    letter-spacing:0.08em;
+  }
+
+  /* ---------- Left rail: mode + log ---------- */
+  .rail{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .rail-card{
+    background:linear-gradient(180deg, var(--body-mid), var(--body-dark));
+    border:1px solid var(--panel-line);
+    border-radius:10px;
+    padding:16px;
+  }
+  .rail-card h6{
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.68rem;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--text-faint);
+    margin-bottom:10px;
+  }
+
+  .angle-toggle{
+    display:flex;
+    border:1px solid var(--panel-line);
+    border-radius:6px;
+    overflow:hidden;
+  }
+  .angle-toggle button{
+    flex:1;
+    background:var(--key-num);
+    color:var(--text-soft);
+    border:none;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.78rem;
+    padding:8px 0;
+    letter-spacing:0.05em;
+    transition:background .15s ease, color .15s ease;
+  }
+  .angle-toggle button.active{
+    background:var(--key-op);
+    color:#1b1d21;
+    font-weight:700;
+  }
+
+  .memory-slots{
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.72rem;
+    color:var(--text-faint);
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .memory-slots .slot{
+    display:flex;
+    justify-content:space-between;
+    border-bottom:1px dashed #33373e;
+    padding-bottom:4px;
+  }
+  .memory-slots .slot b{ color:var(--lcd-bg); font-weight:500; }
+
+  .tape{
+    height:220px;
+    overflow-y:auto;
+    display:flex;
+    flex-direction:column-reverse;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.74rem;
+    color:var(--text-faint);
+    gap:6px;
+    padding-right:4px;
+  }
+  .tape .entry{
+    display:flex;
+    justify-content:space-between;
+    border-bottom:1px solid #2c2f35;
+    padding-bottom:5px;
+  }
+  .tape .entry .expr{ color:var(--text-soft); }
+  .tape .entry .res{ color:var(--key-op); }
+  .tape::-webkit-scrollbar{ width:5px; }
+  .tape::-webkit-scrollbar-thumb{ background:#3a3e45; border-radius:4px; }
+
+  /* ---------- Calculator body ---------- */
+  .calc{
+    background:linear-gradient(160deg, #2b2e34, #17181b 85%);
+    border:1px solid #3a3e45;
+    border-radius:16px;
+    padding:18px;
+    box-shadow:0 30px 60px -25px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.03);
+  }
+
+  /* Screen */
+  .screen{
+    background:linear-gradient(175deg, var(--lcd-bg), var(--lcd-bg-deep));
+    border-radius:8px;
+    padding:16px 18px 12px;
+    margin-bottom:16px;
+    position:relative;
+    overflow:hidden;
+    box-shadow:inset 0 2px 10px rgba(0,0,0,.35), inset 0 -1px 0 rgba(255,255,255,.4);
+  }
+  .screen::after{
+    content:"";
+    position:absolute; inset:0;
+    background:repeating-linear-gradient(
+      to bottom,
+      rgba(0,0,0,0.035) 0px,
+      rgba(0,0,0,0.035) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    pointer-events:none;
+  }
+  .screen-status{
+    display:flex;
+    justify-content:space-between;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.66rem;
+    color:var(--lcd-ink-dim);
+    letter-spacing:0.08em;
+    margin-bottom:6px;
+  }
+  .screen-history{
+    min-height:20px;
+    text-align:right;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.92rem;
+    color:var(--lcd-ink-dim);
+    white-space:nowrap;
+    overflow-x:auto;
+    scrollbar-width:none;
+  }
+  .screen-history::-webkit-scrollbar{ display:none; }
+  .screen-main{
+    text-align:right;
+    font-family:'JetBrains Mono', monospace;
+    font-weight:700;
+    font-size:clamp(1.8rem, 4vw, 2.6rem);
+    color:var(--lcd-ink);
+    line-height:1.15;
+    white-space:nowrap;
+    overflow-x:auto;
+    scrollbar-width:none;
+    text-shadow:0 1px 0 rgba(255,255,255,.25);
+  }
+  .screen-main::-webkit-scrollbar{ display:none; }
+
+  /* Keypad */
+  .keypad{
+    display:grid;
+    grid-template-columns:repeat(5, 1fr);
+    gap:8px;
+  }
+
+  .key{
+    border:none;
+    border-radius:8px;
+    padding:12px 4px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.92rem;
+    font-weight:500;
+    color:#eef0f2;
+    position:relative;
+    cursor:pointer;
+    user-select:none;
+    transition:transform .06s ease, filter .12s ease, box-shadow .12s ease;
+    box-shadow:0 3px 0 rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .key:active{
+    transform:translateY(2px);
+    box-shadow:0 1px 0 rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .key .sub{
+    display:block;
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:0.56rem;
+    font-weight:400;
+    color:rgba(255,255,255,.45);
+    margin-top:2px;
+    letter-spacing:0.03em;
+  }
+
+  .key-num{ background:linear-gradient(180deg, var(--key-num-top), var(--key-num)); }
+  .key-fn{ background:linear-gradient(180deg, var(--key-fn-top), var(--key-fn)); font-size:0.8rem; }
+  .key-op{ background:linear-gradient(180deg, var(--key-op-top), var(--key-op)); color:#241505; font-weight:700; }
+  .key-eq{ background:linear-gradient(180deg, var(--key-eq-top), var(--key-eq)); color:#0d1f14; font-weight:700; }
+  .key-wide{ grid-column:span 2; }
+
+  .key.flash{ filter:brightness(1.35); }
+
+  footer.credit{
+    grid-column:1/-1;
+    text-align:center;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.65rem;
+    color:var(--text-faint);
+    letter-spacing:0.08em;
+    margin-top:4px;
+  }
+
+  @media (max-width: 420px){
+    .key{ font-size:0.82rem; padding:11px 2px;}
+    .screen-main{ font-size:1.7rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="rig">
+
+  <div class="plate">
+    <div class="mark">Reckoner <span>·</span> Scientific</div>
+    <div class="model">MODEL RK-100 &nbsp;|&nbsp; DEG/RAD</div>
+  </div>
+
+  <!-- Left rail -->
+  <div class="rail">
+    <div class="rail-card">
+      <h6>Angle Mode</h6>
+      <div class="angle-toggle">
+        <button id="mode-deg" class="active">DEG</button>
+        <button id="mode-rad">RAD</button>
+      </div>
+    </div>
+
+    <div class="rail-card">
+      <h6>Memory</h6>
+      <div class="memory-slots">
+        <div class="slot"><span>M</span><b id="mem-value">0</b></div>
+      </div>
+      <div class="d-flex gap-2 mt-3">
+        <button class="key key-fn flex-fill" id="mc" style="padding:8px 0;">MC</button>
+        <button class="key key-fn flex-fill" id="mplus" style="padding:8px 0;">M+</button>
+        <button class="key key-fn flex-fill" id="mminus" style="padding:8px 0;">M-</button>
+        <button class="key key-fn flex-fill" id="mr" style="padding:8px 0;">MR</button>
+      </div>
+    </div>
+
+    <div class="rail-card" style="flex:1;">
+      <h6>Tape</h6>
+      <div class="tape" id="tape">
+        <div class="entry"><span class="expr">Ready</span><span class="res">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Calculator -->
+  <div class="calc">
+    <div class="screen">
+      <div class="screen-status">
+        <span id="status-mode">DEG</span>
+        <span id="status-mem">M: 0</span>
+      </div>
+      <div class="screen-history" id="history"></div>
+      <div class="screen-main" id="display">0</div>
+    </div>
+
+    <div class="keypad" id="keypad">
+      <!-- Row 1: scientific -->
+      <button class="key key-fn" data-fn="second">2nd<span class="sub">inv</span></button>
+      <button class="key key-fn" data-fn="pi">&pi;<span class="sub">const</span></button>
+      <button class="key key-fn" data-fn="e">e<span class="sub">const</span></button>
+      <button class="key key-fn" data-fn="clear">C<span class="sub">clear</span></button>
+      <button class="key key-fn" data-fn="back">&larr;<span class="sub">del</span></button>
+
+      <button class="key key-fn" data-fn="sin">sin<span class="sub">sin⁻¹</span></button>
+      <button class="key key-fn" data-fn="cos">cos<span class="sub">cos⁻¹</span></button>
+      <button class="key key-fn" data-fn="tan">tan<span class="sub">tan⁻¹</span></button>
+      <button class="key key-fn" data-fn="paren-open">(</button>
+      <button class="key key-fn" data-fn="paren-close">)</button>
+
+      <button class="key key-fn" data-fn="ln">ln<span class="sub">eˣ</span></button>
+      <button class="key key-fn" data-fn="log">log<span class="sub">10ˣ</span></button>
+      <button class="key key-fn" data-fn="sqrt">&radic;x<span class="sub">x²</span></button>
+      <button class="key key-fn" data-fn="pow">x<sup>y</sup><span class="sub">yroot</span></button>
+      <button class="key key-fn" data-fn="fact">n!<span class="sub">fact</span></button>
+
+      <!-- Row: numbers + ops -->
+      <button class="key key-num" data-num="7">7</button>
+      <button class="key key-num" data-num="8">8</button>
+      <button class="key key-num" data-num="9">9</button>
+      <button class="key key-op" data-op="/">&divide;</button>
+      <button class="key key-fn" data-fn="inv">1/x</button>
+
+      <button class="key key-num" data-num="4">4</button>
+      <button class="key key-num" data-num="5">5</button>
+      <button class="key key-num" data-num="6">6</button>
+      <button class="key key-op" data-op="*">&times;</button>
+      <button class="key key-fn" data-fn="mod">mod</button>
+
+      <button class="key key-num" data-num="1">1</button>
+      <button class="key key-num" data-num="2">2</button>
+      <button class="key key-num" data-num="3">3</button>
+      <button class="key key-op" data-op="-">&minus;</button>
+      <button class="key key-fn" data-fn="ans">Ans</button>
+
+      <button class="key key-num" data-num="0">0</button>
+      <button class="key key-num" data-num=".">.</button>
+      <button class="key key-fn" data-fn="sign">&plusmn;</button>
+      <button class="key key-op" data-op="+">+</button>
+      <button class="key key-eq" data-fn="equals">=</button>
+    </div>
+  </div>
+
+  <footer class="credit">ALL FUNCTIONS EVALUATE ON KEYPRESS · KEYBOARD INPUT SUPPORTED</footer>
+  <footer style="text-align: center; padding: 20px; margin-top: 40px; font-size: 0.85rem; color: #888; border-top: 1px solid #e0e0e0;">
+  <p> © 2026. Created by Lona Smith in the Republic of South Africa. <a href="mailto:lonasmithhq@gmail.com" style="color:#888; text-decoration: none;" >lonasmithhq@gmail.com</a></p>
+  </footer>
+</div>
+
+<script>
+(function(){
+  const displayEl = document.getElementById('display');
+  const historyEl = document.getElementById('history');
+  const tapeEl = document.getElementById('tape');
+  const memValueEl = document.getElementById('mem-value');
+  const statusMemEl = document.getElementById('status-mem');
+  const statusModeEl = document.getElementById('status-mode');
+  const modeDegBtn = document.getElementById('mode-deg');
+  const modeRadBtn = document.getElementById('mode-rad');
+
+  let expr = '';           // raw expression string (what user is building)
+  let displayExpr = '';    // pretty version for display
+  let lastResult = null;
+  let memory = 0;
+  let angleMode = 'DEG';
+  let secondActive = false;
+  let justEvaluated = false;
+
+  const fnLabels = {
+    sin:'sin', cos:'cos', tan:'tan',
+    asin:'sin⁻¹', acos:'cos⁻¹', atan:'tan⁻¹',
+    ln:'ln', exp:'eˣ', log:'log', pow10:'10ˣ',
+    sqrt:'√', sq:'sq'
+  };
+
+  function render(){
+    displayEl.textContent = displayExpr === '' ? '0' : displayExpr;
+    historyEl.textContent = expr && !justEvaluated ? '' : historyEl.textContent;
+  }
+
+  function pushTape(exprStr, resultStr){
+    const row = document.createElement('div');
+    row.className = 'entry';
+    row.innerHTML = `<span class="expr">${exprStr}</span><span class="res">${resultStr}</span>`;
+    tapeEl.appendChild(row);
+    tapeEl.scrollTop = tapeEl.scrollHeight;
+  }
+
+  function flashKey(el){
+    if(!el) return;
+    el.classList.add('flash');
+    setTimeout(()=>el.classList.remove('flash'), 120);
+  }
+
+  function factorial(n){
+    if(n < 0 || Math.floor(n) !== n) return NaN;
+    if(n > 170) return Infinity;
+    let r = 1;
+    for(let i=2;i<=n;i++) r*=i;
+    return r;
+  }
+
+  function toRad(x){ return angleMode === 'DEG' ? x * Math.PI/180 : x; }
+  function fromRad(x){ return angleMode === 'DEG' ? x * 180/Math.PI : x; }
+
+  // Build a safe evaluatable JS string from our token-based expr
+  function compileForEval(str){
+    let s = str;
+    s = s.replace(/π/g, 'Math.PI');
+    s = s.replace(/e(?![a-zA-Z])/g, 'Math.E');
+    s = s.replace(/√\(/g, 'Math.sqrt(');
+    s = s.replace(/\^/g, '**');
+    // sin/cos/tan with degree conversion handled via wrapper functions
+    s = s.replace(/sin⁻¹\(/g, 'asinW(');
+    s = s.replace(/cos⁻¹\(/g, 'acosW(');
+    s = s.replace(/tan⁻¹\(/g, 'atanW(');
+    s = s.replace(/sin\(/g, 'sinW(');
+    s = s.replace(/cos\(/g, 'cosW(');
+    s = s.replace(/tan\(/g, 'tanW(');
+    s = s.replace(/ln\(/g, 'Math.log(');
+    s = s.replace(/log\(/g, 'Math.log10(');
+    s = s.replace(/(\d+(?:\.\d+)?)!/g, 'fact($1)');
+    return s;
+  }
+
+  function evaluateExpression(){
+    if(!expr) return;
+    let compiled = compileForEval(expr);
+    try{
+      const sinW = (x)=> Math.sin(toRad(x));
+      const cosW = (x)=> Math.cos(toRad(x));
+      const tanW = (x)=> Math.tan(toRad(x));
+      const asinW = (x)=> fromRad(Math.asin(x));
+      const acosW = (x)=> fromRad(Math.acos(x));
+      const atanW = (x)=> fromRad(Math.atan(x));
+      const fact = factorial;
+      // eslint-disable-next-line no-eval
+      let result = eval(compiled);
+      if(typeof result !== 'number' || !isFinite(result) || isNaN(result)){
+        throw new Error('math error');
+      }
+      result = Math.round(result * 1e10) / 1e10;
+      pushTape(displayExpr, String(result));
+      historyEl.textContent = displayExpr + ' =';
+      lastResult = result;
+      expr = String(result);
+      displayExpr = String(result);
+      justEvaluated = true;
+      render();
+    }catch(err){
+      historyEl.textContent = displayExpr;
+      displayExpr = 'Error';
+      displayEl.textContent = 'Error';
+      expr = '';
+      justEvaluated = true;
+    }
+  }
+
+  function appendToken(token, displayToken){
+    if(justEvaluated){
+      // start fresh unless the token is an operator (then continue from result)
+      const isOperator = /^[+\-*/^]$/.test(token);
+      if(!isOperator){
+        expr = '';
+        displayExpr = '';
+      }
+      justEvaluated = false;
+      historyEl.textContent = '';
+    }
+    expr += token;
+    displayExpr += (displayToken !== undefined ? displayToken : token);
+    render();
+  }
+
+  function wrapFunction(prefixToken, prefixDisplay){
+    if(justEvaluated){
+      expr = '';
+      displayExpr = '';
+      justEvaluated = false;
+      historyEl.textContent = '';
+    }
+    expr += prefixToken + '(';
+    displayExpr += prefixDisplay + '(';
+    render();
+  }
+
+  function clearAll(){
+    expr = '';
+    displayExpr = '';
+    historyEl.textContent = '';
+    justEvaluated = false;
+    render();
+  }
+
+  function backspace(){
+    if(justEvaluated){ clearAll(); return; }
+    expr = expr.slice(0, -1);
+    displayExpr = displayExpr.slice(0, -1);
+    render();
+  }
+
+  function setAngleMode(mode){
+    angleMode = mode;
+    statusModeEl.textContent = mode;
+    modeDegBtn.classList.toggle('active', mode==='DEG');
+    modeRadBtn.classList.toggle('active', mode==='RAD');
+  }
+
+  function updateMemDisplay(){
+    memValueEl.textContent = memory;
+    statusMemEl.textContent = 'M: ' + memory;
+  }
+
+  modeDegBtn.addEventListener('click', ()=> setAngleMode('DEG'));
+  modeRadBtn.addEventListener('click', ()=> setAngleMode('RAD'));
+
+  document.getElementById('mc').addEventListener('click', ()=>{ memory = 0; updateMemDisplay(); });
+  document.getElementById('mplus').addEventListener('click', ()=>{
+    const val = parseFloat(displayExpr) || lastResult || 0;
+    memory += (typeof val === 'number' ? val : 0);
+    updateMemDisplay();
+  });
+  document.getElementById('mminus').addEventListener('click', ()=>{
+    const val = parseFloat(displayExpr) || lastResult || 0;
+    memory -= (typeof val === 'number' ? val : 0);
+    updateMemDisplay();
+  });
+  document.getElementById('mr').addEventListener('click', ()=> appendToken(String(memory)));
+
+  // Number keys
+  document.querySelectorAll('[data-num]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      flashKey(btn);
+      appendToken(btn.dataset.num);
+    });
+  });
+
+  // Operator keys
+  document.querySelectorAll('[data-op]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      flashKey(btn);
+      const opDisplay = {'/':' ÷ ', '*':' × ', '-':' − ', '+':' + '}[btn.dataset.op];
+      appendToken(btn.dataset.op, opDisplay);
+    });
+  });
+
+  // Function keys
+  document.querySelectorAll('[data-fn]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      flashKey(btn);
+      const fn = btn.dataset.fn;
+      switch(fn){
+        case 'clear': clearAll(); break;
+        case 'back': backspace(); break;
+        case 'equals': evaluateExpression(); break;
+        case 'pi': appendToken('π'); break;
+        case 'e': appendToken('e'); break;
+        case 'paren-open': appendToken('('); break;
+        case 'paren-close': appendToken(')'); break;
+        case 'ans': appendToken(String(lastResult !== null ? lastResult : 0)); break;
+        case 'second':
+          secondActive = !secondActive;
+          btn.classList.toggle('key-op', secondActive);
+          document.querySelectorAll('[data-fn="sin"],[data-fn="cos"],[data-fn="tan"],[data-fn="ln"],[data-fn="log"],[data-fn="sqrt"]').forEach(b=>{
+            const map = {
+              sin: secondActive ? 'sin⁻¹' : 'sin',
+              cos: secondActive ? 'cos⁻¹' : 'cos',
+              tan: secondActive ? 'tan⁻¹' : 'tan',
+              ln: secondActive ? 'eˣ' : 'ln',
+              log: secondActive ? '10ˣ' : 'log',
+              sqrt: secondActive ? 'x²' : '√x'
+            };
+            const key = b.dataset.fn;
+            if(map[key] !== undefined){
+              b.childNodes[0].textContent = map[key];
+            }
+          });
+          break;
+        case 'sin': wrapFunction(secondActive ? 'sin⁻¹' : 'sin', secondActive ? 'sin⁻¹' : 'sin'); break;
+        case 'cos': wrapFunction(secondActive ? 'cos⁻¹' : 'cos', secondActive ? 'cos⁻¹' : 'cos'); break;
+        case 'tan': wrapFunction(secondActive ? 'tan⁻¹' : 'tan', secondActive ? 'tan⁻¹' : 'tan'); break;
+        case 'ln':
+          if(secondActive){ wrapFunction('Math.exp', 'eˣ'); } else { wrapFunction('ln', 'ln'); }
+          break;
+        case 'log':
+          if(secondActive){ wrapFunction('(10**', '10^'); } else { wrapFunction('log', 'log'); }
+          break;
+        case 'sqrt':
+          if(secondActive){ appendToken('**2', '²'); } else { wrapFunction('√', '√'); }
+          break;
+        case 'pow': appendToken('^', '^'); break;
+        case 'fact': appendToken('!', '!'); break;
+        case 'mod': appendToken('%', ' mod '); break;
+        case 'sign':
+          if(displayExpr.startsWith('-')){
+            displayExpr = displayExpr.slice(1);
+            expr = expr.slice(1);
+          } else {
+            displayExpr = '-' + displayExpr;
+            expr = '-' + expr;
+          }
+          render();
+          break;
+      }
+    });
+  });
+
+  // 1/x wraps the whole current expression
+  document.querySelector('[data-fn="inv"]').addEventListener('click', function(){
+    if(justEvaluated){
+      expr = '1/(' + (expr||'0') + ')';
+      displayExpr = '1/(' + (displayExpr||'0') + ')';
+      justEvaluated = false;
+    } else if(expr){
+      expr = '1/(' + expr + ')';
+      displayExpr = '1/(' + displayExpr + ')';
+    }
+    render();
+  });
+
+  // Keyboard support
+  document.addEventListener('keydown', (e)=>{
+    if(/^[0-9.]$/.test(e.key)){ appendToken(e.key); return; }
+    if(['+','-','*','/'].includes(e.key)){
+      const opDisplay = {'/':' ÷ ', '*':' × ', '-':' − ', '+':' + '}[e.key];
+      appendToken(e.key, opDisplay);
+      return;
+    }
+    if(e.key === 'Enter' || e.key === '='){ e.preventDefault(); evaluateExpression(); return; }
+    if(e.key === 'Backspace'){ backspace(); return; }
+    if(e.key === 'Escape'){ clearAll(); return; }
+    if(e.key === '('){ appendToken('('); return; }
+    if(e.key === ')'){ appendToken(')'); return; }
+    if(e.key === '^'){ appendToken('^','^'); return; }
+    if(e.key === '%'){ appendToken('%',' mod '); return; }
+  });
+
+  render();
+  updateMemDisplay();
+})();
+</script>
+</body>
+</html>
